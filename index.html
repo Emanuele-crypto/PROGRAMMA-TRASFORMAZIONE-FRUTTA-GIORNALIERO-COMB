@@ -1051,9 +1051,7 @@ $(document).ready(function() {
         const fornitori = [];
         $('.supplier-row').each(function() {
             const index = $(this).data('supplier-index');
-            const fornitore = $(this).find('.nome-fornitore').val() || '';
-            const altroFornitore = $(this).find('.altro-fornitore').val();
-            const nomeFornitore = fornitore === 'ALTRO' ? altroFornitore : fornitore;
+            const nomeFornitore = getSupplierName($(this));
             const certificazione = $(this).find('.certificazione-prodotto').val() || 'N/D';
             const lineaTrasformazione = $(this).find('.linea-trasformazione').val() || 'N/D';
             
@@ -1136,17 +1134,7 @@ $(document).ready(function() {
             "Bio Prima",
             "Pastorizzato Prima",
             "Conservato Prima",
-            "Note Prima",
-            "Tenore Polpa Seconda",
-            "Brix Seconda",
-            "Pastorizzato Seconda",
-            "Conservato Seconda",
-            "Note Seconda",
-            "Tenore Polpa Torchiato",
-            "Brix Torchiato",
-            "Pastorizzato Torchiato",
-            "Conservato Torchiato",
-            "Note Torchiato"
+            "Note Prima"
         ];
         csvContent += headers.join(",") + "\r\n";
         
@@ -1185,17 +1173,7 @@ $(document).ready(function() {
                 fornitore.caratteristicheProdotti?.prima?.bio || '',
                 fornitore.caratteristicheProdotti?.prima?.pastorizzato || '',
                 fornitore.caratteristicheProdotti?.prima?.conservato || '',
-                fornitore.caratteristicheProdotti?.prima?.note || '',
-                fornitore.caratteristicheProdotti?.seconda?.tenorePolpa || '',
-                fornitore.caratteristicheProdotti?.seconda?.brix || '',
-                fornitore.caratteristicheProdotti?.seconda?.pastorizzato || '',
-                fornitore.caratteristicheProdotti?.seconda?.conservato || '',
-                fornitore.caratteristicheProdotti?.seconda?.note || '',
-                fornitore.caratteristicheProdotti?.torchiato?.tenorePolpa || '',
-                fornitore.caratteristicheProdotti?.torchiato?.brix || '',
-                fornitore.caratteristicheProdotti?.torchiato?.pastorizzato || '',
-                fornitore.caratteristicheProdotti?.torchiato?.conservato || '',
-                fornitore.caratteristicheProdotti?.torchiato?.note || ''
+                fornitore.caratteristicheProdotti?.prima?.note || ''
             ];
             
             csvContent += row.map(field => `"${field}"`).join(",") + "\r\n";
@@ -1295,7 +1273,7 @@ $(document).ready(function() {
                 },
                 destinazioni: {
                     prima: destinazioniPrima.join(', '),
-                  primaAltro: $(this).find('.destinazione-prima').parent().find('.altra-destinazione').val() || '',
+                    primaAltro: $(this).find('.destinazione-prima').parent().find('.altra-destinazione').val() || '',
                     seconda: linea === 'BOE/1100' ? $(this).find('.destinazione-seconda').val() : '',
                     secondaAltro: linea === 'BOE/1100' ? ($(this).find('.destinazione-seconda').parent().find('.altra-destinazione').val() || '') : '',
                     torchiato: $(this).find('.destinazione-torchiato').val(),
@@ -1313,9 +1291,10 @@ $(document).ready(function() {
     function getSupplierName(supplierElement) {
         const fornitore = supplierElement.find('.nome-fornitore').val();
         if (fornitore === 'ALTRO') {
-            return supplierElement.find('.altro-fornitore').val() || '';
+            const altroNome = supplierElement.find('.altro-fornitore').val();
+            return altroNome && altroNome.trim() !== '' ? altroNome.trim() : '';
         }
-        return fornitore || '';
+        return fornitore && fornitore.trim() !== '' ? fornitore.trim() : '';
     }
     
     // Trova l'ultimo fornitore incluso in una combinazione
@@ -2117,7 +2096,7 @@ $(document).ready(function() {
         });
     }
     
-    // Gestione statistiche interattive
+    // GESTIONE STATISTICHE INTERATTIVE COMPLETE
     function openStatistics() {
         $('#stats-modal').fadeIn();
         if (!chartsInitialized) {
@@ -2132,9 +2111,8 @@ $(document).ready(function() {
     }
     
     function initializeCharts() {
+        // Grafico Fornitori
         const ctxFornitori = document.getElementById('chartFornitori').getContext('2d');
-        const ctxRese = document.getElementById('chartRese').getContext('2d');
-        
         charts.fornitori = new Chart(ctxFornitori, {
             type: 'pie',
             data: {
@@ -2148,7 +2126,9 @@ $(document).ready(function() {
                         '#FFCE56',
                         '#4BC0C0',
                         '#9966FF',
-                        '#FF9F40'
+                        '#FF9F40',
+                        '#FF9F40',
+                        '#C9CBCF'
                     ]
                 }]
             },
@@ -2158,11 +2138,21 @@ $(document).ready(function() {
                 plugins: {
                     legend: {
                         position: 'bottom'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.label + ': ' + context.parsed + ' kg (' + 
+                                       ((context.parsed / context.dataset.data.reduce((a, b) => a + b, 0)) * 100).toFixed(1) + '%)';
+                            }
+                        }
                     }
                 }
             }
         });
         
+        // Grafico Rese
+        const ctxRese = document.getElementById('chartRese').getContext('2d');
         charts.rese = new Chart(ctxRese, {
             type: 'bar',
             data: {
@@ -2181,6 +2171,128 @@ $(document).ready(function() {
                         beginAtZero: true,
                         max: 50
                     }
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.dataset.label + ': ' + context.parsed.y + '%';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        
+        // Grafico Certificazioni
+        const ctxCertificazioni = document.getElementById('chartCertificazioni').getContext('2d');
+        charts.certificazioni = new Chart(ctxCertificazioni, {
+            type: 'doughnut',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Certificazioni',
+                    data: [],
+                    backgroundColor: [
+                        '#28a745',
+                        '#dc3545',
+                        '#ffc107',
+                        '#17a2b8',
+                        '#6f42c1',
+                        '#fd7e14'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+        
+        // Grafico Timeline
+        const ctxTimeline = document.getElementById('chartTimeline').getContext('2d');
+        charts.timeline = new Chart(ctxTimeline, {
+            type: 'bar',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Durata Lavorazione (ore)',
+                    data: [],
+                    backgroundColor: '#36A2EB'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: 'y',
+                scales: {
+                    x: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+        
+        // Grafico Efficienza
+        const ctxEfficienza = document.getElementById('chartEfficienza').getContext('2d');
+        charts.efficienza = new Chart(ctxEfficienza, {
+            type: 'radar',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Efficienza (%)',
+                    data: [],
+                    backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    pointBackgroundColor: 'rgba(54, 162, 235, 1)',
+                    pointBorderColor: '#fff',
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: 'rgba(54, 162, 235, 1)'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    r: {
+                        beginAtZero: true,
+                        max: 100
+                    }
+                }
+            }
+        });
+        
+        // Grafico Destinazioni
+        const ctxDestinazioni = document.getElementById('chartDestinazioni').getContext('2d');
+        charts.destinazioni = new Chart(ctxDestinazioni, {
+            type: 'bar',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Quantità per Destinazione (kg)',
+                    data: [],
+                    backgroundColor: [
+                        '#FF6384',
+                        '#36A2EB',
+                        '#FFCE56',
+                        '#4BC0C0',
+                        '#9966FF',
+                        '#FF9F40'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
                 }
             }
         });
@@ -2189,6 +2301,7 @@ $(document).ready(function() {
     function updateStatistics() {
         const programData = collectProgramData();
         
+        // Aggiorna sommario
         const summaryHtml = `
             <div class="summary-item">
                 <div class="summary-value">${programData.fornitori.length}</div>
@@ -2228,6 +2341,7 @@ $(document).ready(function() {
     }
     
     function updateChartsData(data) {
+        // Grafico Fornitori
         const fornitoriLabels = [];
         const fornitoriData = [];
         
@@ -2243,6 +2357,7 @@ $(document).ready(function() {
         charts.fornitori.data.datasets[0].data = fornitoriData;
         charts.fornitori.update();
         
+        // Grafico Rese
         let resePrima = 0, reseSeconda = 0, reseTorchiato = 0;
         let countRese = 0, countBOE = 0;
         
@@ -2267,227 +2382,160 @@ $(document).ready(function() {
             ];
         }
         charts.rese.update();
+        
+        // Grafico Certificazioni
+        const certificationCounts = {};
+        data.fornitori.forEach(f => {
+            const cert = f.certificazione || 'NON SPECIFICATA';
+            certificationCounts[cert] = (certificationCounts[cert] || 0) + 1;
+        });
+        
+        charts.certificazioni.data.labels = Object.keys(certificationCounts);
+        charts.certificazioni.data.datasets[0].data = Object.values(certificationCounts);
+        charts.certificazioni.update();
+        
+        // Grafico Timeline (Durata)
+        const timelineLabels = [];
+        const timelineData = [];
+        
+        data.fornitori.forEach(f => {
+            const nome = f.nome === 'ALTRO' ? f.altroNome : f.nome;
+            if (nome && f.durataLavorazione) {
+                const durataMatch = f.durataLavorazione.match(/(\d+)h\s*(\d+)?m?/);
+                if (durataMatch) {
+                    const ore = parseInt(durataMatch[1]) || 0;
+                    const minuti = parseInt(durataMatch[2]) || 0;
+                    const durataOre = ore + (minuti / 60);
+                    
+                    timelineLabels.push(`F${f.supplierIndex} - ${nome}`);
+                    timelineData.push(durataOre.toFixed(1));
+                }
+            }
+        });
+        
+        charts.timeline.data.labels = timelineLabels;
+        charts.timeline.data.datasets[0].data = timelineData;
+        charts.timeline.update();
+        
+        // Grafico Efficienza (Linee)
+        const lineaEfficiency = {};
+        data.fornitori.forEach(f => {
+            if (f.lineaTrasformazione && f.quantitaTrasformata > 0) {
+                if (!lineaEfficiency[f.lineaTrasformazione]) {
+                    lineaEfficiency[f.lineaTrasformazione] = { total: 0, count: 0 };
+                }
+                const efficiency = (f.rese.prima + f.rese.seconda + f.rese.torchiato) / 3;
+                lineaEfficiency[f.lineaTrasformazione].total += efficiency;
+                lineaEfficiency[f.lineaTrasformazione].count++;
+            }
+        });
+        
+        const efficiencyLabels = Object.keys(lineaEfficiency);
+        const efficiencyData = efficiencyLabels.map(linea => 
+            (lineaEfficiency[linea].total / lineaEfficiency[linea].count).toFixed(1)
+        );
+        
+        charts.efficienza.data.labels = efficiencyLabels;
+        charts.efficienza.data.datasets[0].data = efficiencyData;
+        charts.efficienza.update();
+        
+        // Grafico Destinazioni
+        const destinationCounts = {};
+        data.fornitori.forEach(f => {
+            if (f.destinazioni.prima && f.quantitaProdotti.prima > 0) {
+                const destinations = f.destinazioni.prima.split(', ');
+                destinations.forEach(dest => {
+                    if (dest && dest.trim() !== '') {
+                        destinationCounts[dest] = (destinationCounts[dest] || 0) + f.quantitaProdotti.prima;
+                    }
+                });
+            }
+        });
+        
+        const destLabels = Object.keys(destinationCounts);
+        const destData = Object.values(destinationCounts);
+        
+        charts.destinazioni.data.labels = destLabels;
+        charts.destinazioni.data.datasets[0].data = destData;
+        charts.destinazioni.update();
     }
     
     // Anteprima stampa compatta
     function generateCompactPrintPreview(data) {
         const printWindow = window.open('', '_blank');
-        
-        let totalSeconda = 0;
-        let totalTorchiato = 0;
-        
-        data.fornitori.forEach(f => {
-            if (f.quantitaTrasformata > 0) {
-                if (f.lineaTrasformazione === 'BOE/1100') {
-                    totalSeconda += (f.quantitaTrasformata * f.rese.seconda / 100);
-                }
-                totalTorchiato += (f.quantitaTrasformata * f.rese.torchiato / 100);
-            }
-        });
-        
-        let printContent = `
+        printWindow.document.write(`
             <!DOCTYPE html>
             <html>
             <head>
                 <title>Programma Giornaliero - ${data.dataLavorazione}</title>
                 <style>
-                    * {
-                        margin: 0;
-                        padding: 0;
-                        box-sizing: border-box;
-                    }
-                    
-                    body { 
-                        font-family: 'Arial', sans-serif;
-                        font-size: 11px;
-                        line-height: 1.3;
-                        color: #333;
-                        margin: 15px;
-                    }
-                    
-                    .header {
-                        text-align: center;
-                        margin-bottom: 20px;
-                        border-bottom: 2px solid #1e3c72;
-                        padding-bottom: 10px;
-                    }
-                    
-                    .header h1 {
-                        font-size: 18px;
-                        color: #1e3c72;
-                        margin-bottom: 5px;
-                    }
-                    
-                    .header-info {
-                        display: flex;
-                        justify-content: space-around;
-                        margin-top: 10px;
-                        font-size: 10px;
-                    }
-                    
-                    .suppliers-table {
-                        width: 100%;
-                        border-collapse: collapse;
-                        margin-bottom: 10px;
-                        font-size: 8px;
-                    }
-                    
-                    .suppliers-table th {
-                        background-color: #1e3c72;
-                        color: white;
-                        padding: 3px;
-                        text-align: center;
-                        font-size: 7px;
-                    }
-                    
-                    .suppliers-table td {
-                        border: 1px solid #ddd;
-                        padding: 2px;
-                        text-align: center;
-                        vertical-align: middle;
-                    }
-                    
-                    .bio-cell {
-                        background-color: #ffebee;
-                        color: #dc3545;
-                        font-weight: bold;
-                    }
-                    
-                    .bio-black-cell {
-                        color: #000000;
-                        font-weight: bold;
-                    }
-                    
-                    .combination-group {
-                        background-color: #fff3cd;
-                        border: 2px solid #ffc107;
-                    }
-                    
-                    .combination-individual {
-                        background-color: #fff3cd;
-                        border: 1px solid #ffc107;
-                    }
-                    
-                    .combination-header {
-                        background-color: #ffc107;
-                        color: #856404;
-                        font-weight: bold;
-                        text-align: center;
-                        padding: 3px;
-                    }
-                    
-                    .totals-grid {
-                        display: grid;
-                        grid-template-columns: repeat(3, 1fr);
-                        gap: 8px;
-                        margin-bottom: 10px;
-                    }
-                    
-                    .total-item {
-                        text-align: center;
-                        padding: 6px;
-                        background-color: #e7f3ff;
-                        border: 1px solid #2a5298;
-                    }
-                    
-                    .total-value {
-                        font-size: 14px;
-                        font-weight: bold;
-                        color: #1e3c72;
-                    }
-                    
-                    .total-label {
-                        font-size: 8px;
-                        color: #666;
-                    }
-                    
-                    .footer {
-                        text-align: center;
-                        margin-top: 15px;
-                        font-size: 7px;
-                        color: #666;
-                        border-top: 1px solid #ddd;
-                        padding-top: 8px;
-                    }
-                    
-                    @media print {
-                        body { margin: 8px; }
-                        .header h1 { font-size: 16px; }
-                    }
+                    body { font-family: Arial, sans-serif; font-size: 11px; margin: 15px; }
+                    .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #1e3c72; padding-bottom: 10px; }
+                    .header h1 { font-size: 18px; color: #1e3c72; margin-bottom: 5px; }
+                    table { width: 100%; border-collapse: collapse; font-size: 9px; }
+                    th { background-color: #1e3c72; color: white; padding: 5px; text-align: center; }
+                    td { border: 1px solid #ddd; padding: 3px; text-align: center; }
+                    .footer { text-align: center; margin-top: 15px; font-size: 8px; color: #666; }
                 </style>
             </head>
             <body>
                 <div class="header">
                     <h1>PROGRAMMA GIORNALIERO TRASFORMAZIONE FRUTTA</h1>
                     <div>Sistema di Gestione Produzione - Simone Gatto</div>
-                    <div class="header-info">
-                        <div><strong>Data:</strong> ${data.dataLavorazione ? new Date(data.dataLavorazione).toLocaleDateString('it-IT') : 'N/D'}</div>
-                        <div><strong>Agrume:</strong> ${data.tipoAgrume || 'N/D'}</div>
-                        <div><strong>Fornitori:</strong> ${data.fornitori.length}</div>
-                        <div><strong>Generato:</strong> ${new Date().toLocaleDateString('it-IT')} ${new Date().toLocaleTimeString('it-IT')}</div>
-                    </div>
+                    <div>Data: ${data.dataLavorazione ? new Date(data.dataLavorazione).toLocaleDateString('it-IT') : 'N/D'} | 
+                         Agrume: ${data.tipoAgrume || 'N/D'} | 
+                         Fornitori: ${data.fornitori.length}</div>
                 </div>
                 
-                <div class="totals-grid">
-                    <div class="total-item">
-                        <div class="total-value">${data.entrataGiornaliera.toLocaleString()}</div>
-                        <div class="total-label">Kg Entrata Totale</div>
-                    </div>
-                    <div class="total-item">
-                        <div class="total-value">${data.trasformataTotale.toLocaleString()}</div>
-                        <div class="total-label">Kg Trasformati</div>
-                    </div>
-                    <div class="total-item">
-                        <div class="total-value">${data.giacenzaTotale.toLocaleString()}</div>
-                        <div class="total-label">Kg Giacenza</div>
-                    </div>
-                </div>
-
-                <table class="suppliers-table">
+                <table>
                     <thead>
                         <tr>
                             <th>Fornitore</th>
-                            <th>Q Entrata<br/>(kg)</th>
-                            <th>Q Giacenza<br/>(kg)</th>
-                            <th>Cert.</th>
+                            <th>Entrata (kg)</th>
+                            <th>Trasformata (kg)</th>
+                            <th>Giacenza (kg)</th>
+                            <th>Certificazione</th>
                             <th>Varietà</th>
                             <th>Linea</th>
-                            <th>Portata<br/>(kg/h)</th>
                             <th>Inizio</th>
                             <th>Fine</th>
-                            <th>Succo 1ª<br/>(kg)</th>
-                            <th>Pastorizzato</th>
-                            <th>Dest.</th>
-                            <th>Polpa</th>
-                            <th>°BX</th>
-                            <th>Cons.</th>
-                            <th>Bio</th>
+                            <th>Durata</th>
                         </tr>
                     </thead>
                     <tbody>
-        `;
-        
-        // Logica di stampa come nel codice precedente...
-        // [Il resto della funzione di stampa rimane uguale]
-        
-        printContent += `
+                        ${data.fornitori.map(f => {
+                            const nome = f.nome === 'ALTRO' ? f.altroNome : f.nome;
+                            const varieta = f.varieta === 'ALTRO' ? f.altraVarieta : f.varieta;
+                            const orarioFine = f.orarioFineDisplay ? f.orarioFineDisplay.replace(/<[^>]*>/g, '') : '';
+                            return `
+                                <tr>
+                                    <td><strong>F${f.supplierIndex} - ${nome || 'N/D'}</strong></td>
+                                    <td>${f.quantitaEntrata}</td>
+                                    <td>${f.quantitaTrasformata}</td>
+                                    <td>${f.giacenza}</td>
+                                    <td>${f.certificazione || 'N/D'}</td>
+                                    <td>${varieta || 'N/D'}</td>
+                                    <td>${f.lineaTrasformazione || 'N/D'}</td>
+                                    <td>${f.orarioInizio || '-'}</td>
+                                    <td>${orarioFine || '-'}</td>
+                                    <td>${f.durataLavorazione || '-'}</td>
+                                </tr>
+                            `;
+                        }).join('')}
                     </tbody>
                 </table>
                 
                 <div class="footer">
-                    <p>Documento generato automaticamente - Sistema di Gestione Produzione Simone Gatto</p>
-                    <p>Ultima revisione: ${data.ultimaRevisione}</p>
+                    <p>Documento generato automaticamente - ${new Date().toLocaleDateString('it-IT')} ${new Date().toLocaleTimeString('it-IT')}</p>
                 </div>
             </body>
             </html>
-        `;
-        
-        printWindow.document.write(printContent);
+        `);
         printWindow.document.close();
         printWindow.focus();
     }
     
-    // VALIDAZIONE PROGRAMMA CORRETTA
+    // VALIDAZIONE PROGRAMMA CORRETTA - FIX PRINCIPALE
     function validateProgram() {
         if (!$('#tipo-agrume-giornaliero').val()) {
             alert('Seleziona il tipo di agrume');
@@ -2504,19 +2552,29 @@ $(document).ready(function() {
             return false;
         }
         
+        // VALIDAZIONE CORRETTA - Controlla ogni fornitore
         let isValid = true;
+        let firstEmptySupplier = null;
+        
         $('.supplier-row').each(function() {
             const nomeFornitore = getSupplierName($(this));
             
-            if (!nomeFornitore) {
+            // Se il nome del fornitore è vuoto o null
+            if (!nomeFornitore || nomeFornitore.trim() === '') {
+                if (!firstEmptySupplier) {
+                    firstEmptySupplier = $(this);
+                }
                 isValid = false;
-                $(this)[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
-                alert('Inserisci il nome del fornitore per tutti i fornitori aggiunti');
-                return false;
             }
         });
         
-        return isValid;
+        if (!isValid && firstEmptySupplier) {
+            firstEmptySupplier[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+            alert('Inserisci il nome del fornitore per tutti i fornitori aggiunti');
+            return false;
+        }
+        
+        return true;
     }
     
     // Eventi principali
@@ -2537,17 +2595,14 @@ $(document).ready(function() {
         }
     });
     
-    // Pulsante applica combinazione
     $('#applica-combinazione').click(function() {
         applyCombination();
     });
     
-    // Pulsante reset combinazione
     $('#reset-combinazione').click(function() {
         resetCombination();
     });
     
-    // Pulsante aggiungi fornitore
     $('#aggiungi-fornitore').click(function() {
         if (!$('#tipo-agrume-giornaliero').val()) {
             alert('Seleziona prima il tipo di agrume');
@@ -2556,30 +2611,34 @@ $(document).ready(function() {
         addSupplier();
     });
     
-    // Pulsante apri statistiche
     $('#apri-statistiche').click(function() {
+        if ($('.supplier-row').length === 0) {
+            alert('Aggiungi almeno un fornitore per visualizzare le statistiche');
+            return;
+        }
         openStatistics();
     });
     
-    // Chiudi modal statistiche
     $('.close-stats').click(function() {
         closeStatistics();
     });
     
-    // Chiudi modal cliccando fuori
     $(window).click(function(event) {
         if (event.target.id === 'stats-modal') {
             closeStatistics();
         }
     });
     
-    // Anteprima stampa
     $('#anteprima-stampa').click(function() {
+        if ($('.supplier-row').length === 0) {
+            alert('Aggiungi almeno un fornitore per generare l\'anteprima');
+            return;
+        }
         const programData = collectProgramData();
         generateCompactPrintPreview(programData);
     });
     
-    // SALVATAGGIO PROGRAMMA - FUNZIONE CORRETTA E OPERATIVA
+   // SALVATAGGIO PROGRAMMA - FUNZIONE CORRETTA E OPERATIVA
     $('#salva-programma').click(function() {
         if (!validateProgram()) {
             return;
@@ -2650,4 +2709,4 @@ $(document).ready(function() {
 });
 </script>
 </body>
-</html>
+</html> 
